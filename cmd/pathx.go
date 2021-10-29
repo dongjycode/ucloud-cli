@@ -479,12 +479,16 @@ func NewCmdUGA3List(out io.Writer) *cobra.Command {
 			// print pathx detail information
 			if detail && len(instanceId) > 0 {
 				instanceInfo := forwardInfos[0]
+				if global.JSON {
+					base.PrintJSON(instanceInfo, out)
+					return
+				}
 				printPathxDetail(instanceInfo, out)
 				return
 			}
-			list := make([]Uga3DescribeRow, 0)
+			list := make([]PathxDescribeRow, 0)
 			for _, item := range forwardInfos {
-				row := Uga3DescribeRow{}
+				row := PathxDescribeRow{}
 				row.ResourceID = item.InstanceId
 				row.CName = item.CName
 				row.Name = item.Name
@@ -502,6 +506,10 @@ func NewCmdUGA3List(out io.Writer) *cobra.Command {
 				row.EgressIpList = strings.Join(egressIps, "|")
 
 				list = append(list, row)
+			}
+			if global.JSON {
+				_ = base.PrintJSON(list, out)
+				return
 			}
 			base.PrintTable(list, []string{
 				"ResourceID", "CName", "Name", "AccelerationArea", "OriginAreaCode",
@@ -636,23 +644,27 @@ func NewPathxPriceList(out io.Writer) *cobra.Command {
 				base.HandleError(err)
 				os.Exit(1)
 			}
-			list := make([]UGA3PriceRow, 0)
+			list := make([]PathxPriceRow, 0)
 			priceList := response.UGA3Price
 			if len(priceList) == 0 {
 				base.HandleError(fmt.Errorf("Not found acceleration area price information."))
 				os.Exit(1)
 			}
-			//fmt.Fprintf(out,"Aceeleration area price information (unit:￥) :")
 			for _, info := range priceList {
-				row := UGA3PriceRow{
-					AccelerationBandwidthPrice: fmt.Sprintf("%s%s", "￥", strconv.FormatFloat(info.AccelerationBandwidthPrice, 'g', 12, 64)),
-					//AccelerationAreaName: info.AccelerationAreaName,
-					AccelerationForwarderPrice: fmt.Sprintf("%s%s", "￥", strconv.FormatFloat(info.AccelerationForwarderPrice, 'g', 12, 64)),
+				row := PathxPriceRow{
+					AccelerationBandwidthPrice: info.AccelerationBandwidthPrice,
+					AccelerationAreaName:       info.AccelerationAreaName,
+					AccelerationForwarderPrice: info.AccelerationBandwidthPrice,
 					AccelerationArea:           info.AccelerationArea,
 				}
 				list = append(list, row)
 			}
-			base.PrintTable(list, []string{"AccelerationArea", "AccelerationBandwidthPrice", "AccelerationForwarderPrice"})
+			if global.JSON {
+				base.PrintJSON(list, out)
+				return
+			}
+			fmt.Fprintf(out, "Aceeleration areas price (unit:￥) :\n")
+			base.PrintTable(list, []string{"AccelerationArea", "AccelerationAreaName", "AccelerationBandwidthPrice", "AccelerationForwarderPrice"})
 		},
 	}
 	flags := cmd.Flags()
@@ -729,6 +741,10 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 						FlagEmoji:   item.FlagEmoji,
 					})
 				}
+				if global.JSON {
+					base.PrintJSON(areasGroup, out)
+					return
+				}
 				fmt.Fprintln(out, "Origin areas :")
 				for area := range areasGroup {
 					fmt.Fprintf(out, "ContinentCode:  %s\n", area)
@@ -738,6 +754,9 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 				}
 				return
 			}
+
+			outMap := make(map[string]interface{})
+
 			areaGetReq.Domain = &originDomain
 			areaGetReq.IPList = &originIp
 			response, err := base.BizClient.DescribeUGA3Area(areaGetReq)
@@ -752,18 +771,21 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 			}
 			// recommend one area for user
 			forwardArea := forwardAreas[0]
-
-			fmt.Fprintf(out, "Recommend origin area:(%s)\n", forwardArea.ContinentCode)
 			areas := make([]PathxOptionalAreaRow, 0)
 			areas = append(areas, PathxOptionalAreaRow{
-				AreaCode:    forwardArea.AreaCode,
-				Area:        forwardArea.Area,
-				CountryCode: forwardArea.CountryCode,
-				FlagUnicode: forwardArea.FlagUnicode,
-				FlagEmoji:   forwardArea.FlagEmoji,
+				AreaCode:      forwardArea.AreaCode,
+				Area:          forwardArea.Area,
+				CountryCode:   forwardArea.CountryCode,
+				FlagUnicode:   forwardArea.FlagUnicode,
+				FlagEmoji:     forwardArea.FlagEmoji,
+				ContinentCode: forwardArea.ContinentCode,
 			})
-			base.PrintTable(areas, []string{"AreaCode", "Area", "CountryCode", "FlagUnicode", "FlagEmoji"})
-			fmt.Println()
+			outMap["recommendAreas"] = areas
+			if !global.JSON {
+				fmt.Fprintf(out, "Recommend origin area:(%s)\n", forwardArea.ContinentCode)
+				base.PrintTable(areas, []string{"AreaCode", "Area", "CountryCode", "FlagUnicode", "FlagEmoji"})
+				fmt.Println()
+			}
 
 			// display acceleration areas
 			if !noAccel {
@@ -784,12 +806,21 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 					base.HandleError(fmt.Errorf("Not found the acceleration area information."))
 					os.Exit(1)
 				}
-				fmt.Fprintf(out, "Acceleration areas :\n")
+				if !global.JSON {
+					fmt.Fprintf(out, "Acceleration areas :\n")
+				}
+				accelerationAreaMaps := make([]map[string]interface{}, 0)
 				for _, item := range accelerationInfos {
+					accelerationAreaMap := make(map[string]interface{})
 					// User did not provide acceleration-area flag
-					if len(accelerationArea) == 0 {
-						fmt.Fprintf(out, "%s(%s):\n", item.AccelerationName, item.AccelerationArea)
+					if !global.JSON {
+						if len(accelerationArea) == 0 {
+							fmt.Fprintf(out, "%s(%s):\n", item.AccelerationName, item.AccelerationArea)
+						}
 					}
+					accelerationAreaMap["accelerationArea"] = item.AccelerationArea
+					accelerationAreaMap["accelerationName"] = item.AccelerationName
+
 					list := make([]PathxOptimizationRow, 0)
 					nodeDelays := item.NodeInfo
 					for _, node := range nodeDelays {
@@ -807,12 +838,18 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 						row.LossPathx = fmt.Sprintf("%s%s", strconv.FormatFloat(node.LossOptimization, 'g', 12, 64), "%")
 						list = append(list, row)
 					}
-					base.PrintTable(list, []string{"AreaCode", "Area", "CountryCode", "FlagUnicode", "FlagEmoji",
-						"Latency", "LatencyWAN", "LatencyPathX", "Loss", "LossWAN", "LossPathx"})
+					accelerationAreaMap["nodes"] = list
+					accelerationAreaMaps = append(accelerationAreaMaps, accelerationAreaMap)
+					if !global.JSON {
+						base.PrintTable(list, []string{"AreaCode", "Area", "CountryCode", "FlagUnicode", "FlagEmoji",
+							"Latency", "LatencyWAN", "LatencyPathX", "Loss", "LossWAN", "LossPathx"})
+					}
 				}
-				return
+				outMap["accelerationAreas"] = accelerationAreaMaps
 			}
-
+			if global.JSON {
+				base.PrintJSON(outMap, out)
+			}
 		},
 	}
 	flags := cmd.Flags()
@@ -837,19 +874,19 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-type UGA3PriceRow struct {
+type PathxPriceRow struct {
 	// 加速大区代码
 	AccelerationArea string
 	// 加速大区名称
 	AccelerationAreaName string
 	// 转发配置价格
-	AccelerationForwarderPrice string
+	AccelerationForwarderPrice float64
 	// 加速配置带宽价格
-	AccelerationBandwidthPrice string
+	AccelerationBandwidthPrice float64
 }
 
 // describe UGA3 instance information row
-type Uga3DescribeRow struct {
+type PathxDescribeRow struct {
 	// 加速配置ID
 	ResourceID string
 	// 加速域名
