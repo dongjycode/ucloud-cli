@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -68,30 +69,30 @@ func NewCmdUGA3Create(out io.Writer) *cobra.Command {
 			spinner.Start("The pathx resource creating")
 			if *createPathxReq.OriginIPList == "" && *createPathxReq.OriginDomain == "" {
 				spinner.Fail(fmt.Errorf("The origin-ip and origin-domain cannot be empty at the same time"))
-				return
+				os.Exit(1)
 			}
 			portIntList := make([]int, 0)
 			originPortIntList := make([]int, 0)
 			if len(ports) > 0 || len(originPorts) > 0 {
 				if len(ports) == 0 {
 					spinner.Fail(fmt.Errorf("The port cannot be empty."))
-					return
+					os.Exit(1)
 				} else if len(originPorts) == 0 {
 					spinner.Fail(fmt.Errorf("The origin-port cannot be empty."))
-					return
+					os.Exit(1)
 				}
 				if strings.EqualFold(protocol, "UDP") {
 					spinner.Fail(fmt.Errorf("The udp protocol is temporarily not supported for create"))
-					return
+					os.Exit(1)
 				} else if !strings.EqualFold(protocol, "TCP") &&
 					!strings.EqualFold(protocol, "UDP") {
 					spinner.Fail(fmt.Errorf("The value of protocol input error,please input 'TCP' or 'UDP',and the value entered is not case sensitive"))
-					return
+					os.Exit(1)
 				}
 				tcpPortList, err := formatPortList(ports)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				// tcpPorts convert to []int
 				for _, tcpPort := range tcpPortList {
@@ -101,7 +102,7 @@ func NewCmdUGA3Create(out io.Writer) *cobra.Command {
 				rsTcpPortList, err := formatPortList(originPorts)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				// rsTcpPorts convert to []int
 				for _, rsTcpPort := range rsTcpPortList {
@@ -110,17 +111,17 @@ func NewCmdUGA3Create(out io.Writer) *cobra.Command {
 				}
 				if len(portIntList) != len(originPortIntList) {
 					spinner.Fail(fmt.Errorf("The number of port must be consistent with the number of origin-port."))
-					return
+					os.Exit(1)
 				} else if len(portIntList) >= 10 {
 					spinner.Fail(fmt.Errorf("The number of port cannot greater than or equals to 10"))
-					return
+					os.Exit(1)
 				}
 			}
 			if strings.EqualFold(*createPathxReq.ChargeType, "Month") {
 				*createPathxReq.Quantity = 0
 			} else if *createPathxReq.Quantity <= 0 {
 				spinner.Fail(fmt.Errorf("If the value of charge-type is 'Year' or 'Hour',the value of quantity must be greater than 0"))
-				return
+				os.Exit(1)
 			}
 
 			switch strings.ToLower(*createPathxReq.ChargeType) {
@@ -135,12 +136,12 @@ func NewCmdUGA3Create(out io.Writer) *cobra.Command {
 			createUGA3InstanceResp, err := base.BizClient.CreateUGA3Instance(createPathxReq)
 			if err != nil {
 				spinner.Fail(err)
-				return
+				os.Exit(1)
 			}
 			if createUGA3InstanceResp == nil || createUGA3InstanceResp.InstanceId == "" ||
 				&createUGA3InstanceResp.InstanceId == nil {
 				spinner.Fail(fmt.Errorf("An unknown error occurred and could not be created successfully."))
-				return
+				os.Exit(1)
 			}
 			spinner.Stop()
 
@@ -159,7 +160,7 @@ func NewCmdUGA3Create(out io.Writer) *cobra.Command {
 				_, err := base.BizClient.CreateUGA3Port(createPathxPortReq)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				spinner.Stop()
 			}
@@ -227,7 +228,7 @@ func NewCmdUGA3Delete(out io.Writer) *cobra.Command {
 				sure, err := ux.Prompt("Are you sure you want to delete this resource ?")
 				if err != nil {
 					base.Cxt.Println(err)
-					return
+					os.Exit(1)
 				}
 				if !sure {
 					return
@@ -238,7 +239,7 @@ func NewCmdUGA3Delete(out io.Writer) *cobra.Command {
 			_, deletePortErr := base.BizClient.DeleteUGA3Port(deleteUga3PortReq)
 			if deletePortErr != nil {
 				spinner.Fail(deletePortErr)
-				return
+				os.Exit(1)
 			}
 			spinner.Stop()
 
@@ -250,7 +251,7 @@ func NewCmdUGA3Delete(out io.Writer) *cobra.Command {
 			_, err := base.BizClient.DeleteUGA3Instance(deleteUga3Req)
 			if err != nil {
 				spinner.Fail(err)
-				return
+				os.Exit(1)
 			}
 			spinner.Stop()
 		},
@@ -315,7 +316,7 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				spinner.Start(fmt.Sprintf("Starting modify the pathx[%s] bandwidth", instanceId))
 				if *modifyBandwidthReq.Bandwidth < 1 || *modifyBandwidthReq.Bandwidth > 100 {
 					spinner.Fail(fmt.Errorf("The value of bandwidth size cannot be less than 1 and cannot be greater than 100"))
-					return
+					os.Exit(1)
 				}
 				modifyBandwidthReq.SetProjectIdRef(modifyInstanceReq.GetProjectIdRef())
 				modifyBandwidthReq.SetRegionRef(modifyInstanceReq.GetRegionRef())
@@ -323,7 +324,7 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				_, err := base.BizClient.ModifyUGA3Bandwidth(modifyBandwidthReq)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				spinner.Stop()
 			}
@@ -335,7 +336,7 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				_, err := base.BizClient.ModifyUGA3OriginInfo(modifyOriginInfoReq)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				spinner.Stop()
 			}
@@ -344,7 +345,7 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				_, err := base.BizClient.ModifyUGA3Instance(modifyInstanceReq)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				spinner.Stop()
 			}
@@ -356,23 +357,23 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				spinner.Start(fmt.Sprintf("Starting modify the pathx[%s] port", instanceId))
 				if len(tcpPorts) == 0 {
 					spinner.Fail(fmt.Errorf("The port cannot be empty."))
-					return
+					os.Exit(1)
 				} else if len(rsTcpPorts) == 0 {
 					spinner.Fail(fmt.Errorf("The origin-port cannot be empty."))
-					return
+					os.Exit(1)
 				}
 				if strings.EqualFold(protocol, "UDP") {
 					spinner.Fail(fmt.Errorf("The udp protocol is temporarily not supported for create"))
-					return
+					os.Exit(1)
 				} else if !strings.EqualFold(protocol, "TCP") &&
 					!strings.EqualFold(protocol, "UDP") {
 					spinner.Fail(fmt.Errorf("The value of protocol input error,please input 'TCP' or 'UDP',and the value entered is not case sensitive"))
-					return
+					os.Exit(1)
 				}
 				tcpPortList, err := formatPortList(tcpPorts)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				// tcpPorts convert to []int
 				for _, tcpPort := range tcpPortList {
@@ -382,7 +383,7 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				rsTcpPortList, err := formatPortList(rsTcpPorts)
 				if err != nil {
 					spinner.Fail(err)
-					return
+					os.Exit(1)
 				}
 				// rsTcpPorts convert to []int
 				for _, rsTcpPort := range rsTcpPortList {
@@ -391,10 +392,10 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				}
 				if len(tcpPortIntList) != len(rsTcpPortIntList) {
 					spinner.Fail(fmt.Errorf("The number of port must be consistent with the number of origin-port."))
-					return
+					os.Exit(1)
 				} else if len(tcpPortIntList) >= 10 {
 					spinner.Fail(fmt.Errorf("The number of port cannot greater than or equals to 10"))
-					return
+					os.Exit(1)
 				}
 			}
 			// ModifyUGA3Port
@@ -409,7 +410,7 @@ func NewCmdUGA3Modify(out io.Writer) *cobra.Command {
 				_, err := base.BizClient.ModifyUGA3Port(modifyPortReq)
 				if err != nil {
 					base.HandleError(err)
-					return
+					os.Exit(1)
 				}
 				spinner.Stop()
 			}
@@ -467,13 +468,13 @@ func NewCmdUGA3List(out io.Writer) *cobra.Command {
 			resp, err := base.BizClient.DescribeUGA3Instance(getPathxListReq)
 			if err != nil {
 				base.HandleError(err)
-				return
+				os.Exit(1)
 			}
 			forwardInfos := resp.ForwardInstanceInfos
 			// may be no UGA3 instance under the current project
 			if len(forwardInfos) == 0 {
 				base.HandleError(fmt.Errorf("No pathx resource found under the current project."))
-				return
+				os.Exit(1)
 			}
 			// print pathx detail information
 			if detail && len(instanceId) > 0 {
@@ -618,7 +619,7 @@ func NewPathxPriceList(out io.Writer) *cobra.Command {
 				*priceReq.Quantity = 0
 			} else if *priceReq.Quantity <= 0 {
 				base.HandleError(fmt.Errorf("If the value of charge-type is 'Year' or 'Hour',its value must be greater than 0"))
-				return
+				os.Exit(1)
 			}
 
 			switch strings.ToLower(*priceReq.ChargeType) {
@@ -633,13 +634,13 @@ func NewPathxPriceList(out io.Writer) *cobra.Command {
 			response, err := base.BizClient.GetUGA3Price(priceReq)
 			if err != nil {
 				base.HandleError(err)
-				return
+				os.Exit(1)
 			}
 			list := make([]UGA3PriceRow, 0)
 			priceList := response.UGA3Price
 			if len(priceList) == 0 {
 				base.HandleError(fmt.Errorf("Not found acceleration area price information."))
-				return
+				os.Exit(1)
 			}
 			//fmt.Fprintf(out,"Aceeleration area price information (unit:￥) :")
 			for _, info := range priceList {
@@ -708,12 +709,12 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 				response, err := base.BizClient.DescribeUGA3Area(areaGetReq)
 				if err != nil {
 					base.HandleError(err)
-					return
+					os.Exit(1)
 				}
 				forwardAreas := response.AreaSet
 				if len(forwardAreas) == 0 {
 					base.HandleError(fmt.Errorf("Not found the origin area list"))
-					return
+					os.Exit(1)
 				}
 				areasGroup := make(map[string][]PathxOptionalAreaRow)
 				for _, item := range forwardAreas {
@@ -742,12 +743,12 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 			response, err := base.BizClient.DescribeUGA3Area(areaGetReq)
 			if err != nil {
 				base.HandleError(err)
-				return
+				os.Exit(1)
 			}
 			forwardAreas := response.AreaSet
 			if len(forwardAreas) == 0 {
 				base.HandleError(fmt.Errorf("Not found the origin area list"))
-				return
+				os.Exit(1)
 			}
 			// recommend one area for user
 			forwardArea := forwardAreas[0]
@@ -776,12 +777,12 @@ func NewCmdPathxAreaList(out io.Writer) *cobra.Command {
 				optimizationResponse, err := base.BizClient.DescribeUGA3Optimization(optimizationReq)
 				if err != nil {
 					base.HandleError(err)
-					return
+					os.Exit(1)
 				}
 				accelerationInfos := optimizationResponse.AccelerationInfos
 				if len(accelerationInfos) == 0 {
 					base.HandleError(fmt.Errorf("Not found the acceleration area information."))
-					return
+					os.Exit(1)
 				}
 				fmt.Fprintf(out, "Acceleration areas :\n")
 				for _, item := range accelerationInfos {
